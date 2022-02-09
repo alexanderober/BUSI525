@@ -1,7 +1,7 @@
 ---
 title: "Problem Sheet 1"
 author: "Alexander Ober"
-date: "1/16/2022"
+date: "2/8/2022"
 output:
   pdf_document: default
   html_document: default
@@ -11,9 +11,12 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Code is posted at the following site: https://github.com/alexanderober/BUSI525/tree/main/PS1
+
 ## Problem 1
 
-Note throughout I construct p-values, etc., as if the alternative is one-sided, since presumably we don't care if the alpha is negative.
+Note throughout I test at 5% confidence and as if the alternative is two-sided, since this is what the Wermers survey (pg. 149) suggests to do. I then assume skill is assumed if the t-stat is positive AND significant. In effect, this is a 2.5% one-sided test. Using one-sided 5% tests directly produces similar results. 
+
 ### (a)
 
 ```{r, echo = FALSE}
@@ -22,7 +25,7 @@ N <- 1000
 T <- 120
 mean_mkt <- 0.05/12
 sd_mkt <- 0.2/sqrt(12)
-sd_res <- 0.3/sqrt(12)
+sd_res <- 0.1/sqrt(12)
 alpha <- rep(0, N)
 
 M <- matrix(rep(rnorm(T, mean = mean_mkt, sd = sd_mkt), N), nrow=T)
@@ -47,15 +50,17 @@ for (i in 1:N){
   
   alpha_hat[i] <- summ$coefficients[1, 1]
   tstats[i] <- summ$coefficients[1, 3]
-  ## generate one-sided p-value (default output is two-sided)
-  pvals[i] <- ifelse(tstats[i] > 0, 
-                     summary(mod)$coefficients[1, 4]/2,
-                     1 - summary(mod)$coefficients[1, 4]/2)
+  pvals[i] <- summ$coefficients[1, 4]
+  
+  ## code to generate one-sided p-value (default output is two-sided)
+  # pvals[i] <- ifelse(tstats[i] > 0, 
+  #                   summary(mod)$coefficients[1, 4]/2,
+  #                   1 - summary(mod)$coefficients[1, 4]/2)
                      
 }
 
 ```
-`r length(pvals[pvals < 0.05])` of the 1000 funds have significantly positive alphas. We'd expect about 5% of the statistics to be significant, which is what we see.
+`r length(pvals[(pvals < 0.05) & (tstats > 0)])` of the 1000 funds have significantly positive alphas. We'd expect about 2.5% = 5/2% of the statistics to be significant and positive, which is what we see.
 
 ### (b)
 Here are some plots:
@@ -66,7 +71,7 @@ hist(tstats, breaks = 16)
 ```
 
 ### (c)
-The distribution looks essentially uniform[0, 1]. This is not too surprising, as under the null the coefficients have a t distribution centered at 0, so p values are uniformly distributed. (For any $p \in \mathbb{R},$ if $F$ is the t stat cdf under the null, and the alternative is of the form $tstat > 0$, then by symmetry of the t-distribution cdf, $$ Prob(pval < p) = P(F^{-1}(pval) < F^{-1}(p)) = P(1 - tstat < F^{-1}(p)) = 1 - F(1 - F^{-1}(p)) = 1 - (1 -p) = p.$$)
+The distribution looks essentially uniform[0, 1]. This is not too surprising, as under the null the coefficients have a t distribution centered at 0, so p values are uniformly distributed. This is illustrated in one of the footnotes in the Wermers 2011 survey.
 
 ## Problem 2
 
@@ -80,10 +85,11 @@ tp <- rep(0, 5)
 fn <- rep(0, 5)
 fp <- rep(0, 5)
 tn <- rep(0, 5)
+num <-  rep(0, 5)
 for (lambda in c(0.1, 0.25, 0.5, 0.75)){
   
   ## generate a proportion of positive alphas
-  alpha <- c(rep(0.025/12, lambda*N), rep(0, (1-lambda)*N))
+  alpha <- c(rep(0.05/12, lambda*N), rep(0, (1-lambda)*N))
   M_alpha <- matrix(rep(alpha, T), nrow = T, byrow = TRUE)
   
   ## skilled funds correspond to the first lambda*N columns of the matrix
@@ -103,10 +109,13 @@ for (lambda in c(0.1, 0.25, 0.5, 0.75)){
     
     alpha_hat[i] <- summ$coefficients[1, 1]
     tstats[i] <- summ$coefficients[1, 3]
-    ## generate one-sided p-value (default output is two-sided)
-    pvals[i] <- ifelse(tstats[i] > 0, 
-                     summary(mod)$coefficients[1, 4]/2,
-                     1 - summary(mod)$coefficients[1, 4]/2)
+    pvals[i] <- summ$coefficients[1, 4]
+  
+  ## code to generate one-sided p-value (default output is two-sided)
+  # pvals[i] <- ifelse(tstats[i] > 0, 
+  #                   summary(mod)$coefficients[1, 4]/2,
+  #                   1 - summary(mod)$coefficients[1, 4]/2)
+    
   }
   
   ## generate some histograms
@@ -126,20 +135,29 @@ for (lambda in c(0.1, 0.25, 0.5, 0.75)){
   
   j <- j+1
   
-  tp[j] <- length(skilled_pvals[skilled_pvals < 0.05])
+  tp[j] <- length(skilled_pvals[(skilled_pvals < 0.05) & 
+                                  (skilled_tstats > 0)])
   fn[j] <- lambda*N - tp[j]
-  fp[j] <- length(unskilled_pvals[unskilled_pvals < 0.05])
+  fp[j] <- length(unskilled_pvals[(unskilled_pvals < 0.05) & 
+                                    (unskilled_tstats > 0)])
   tn[j] <- (1-lambda)*N - fp[j]
+  
+  ## number of insignificant skilled estimates
+  num[j] <-  lambda*N - length(skilled_pvals[(skilled_pvals < 0.05)])
 }
 ```
 
-The distributions of t-stats and p-values visibly shift to the right as we increase lambda, which is what we'd expect as more of the funds are skilled. However, although the p-values do shift a little bit to the left (i.e., towards more slopes being statistically non-zero), the shift isn't massive. This is perhaps not too surprising since there's a lot of noise in the error terms, making skill fairly challenging to detect even when the alpha is half the market risk premium.  
+The distributions of t-stats and p-values visibly shift to the right and left, respectively, as we increase lambda, which is what we'd expect as more of the funds are skilled. This shift in the p-values is particularly pronounced among significant (<5%) p-values. 
 
 ### (b)
 
-Below I construct four tables. The percentage (multiply by 1000 for the number) of truly skilled funds with insignificant alpha estimates is given in the false negative cell. This number is generally around 90\% or maybe a bit more of the total number of skilled funds. The number of truly unskilled funds identified as skilled based on significantly positive alpha estimates is given in the false positive cell, and generally consists of around 5\% of the unskilled funds. This is what we'd expect under the null of no skill.
+Below I construct four tables containing proportions (out of N = 1000) of the corresponding samples. 
 
-Lambda = 0.1
+The number of truly skilled funds with insignificant alpha estimates for $\lambda = 0.1, 0.25, 0.5, 0.75$ are `r num[1]`, `r num[2]`, `r num[3]`, `r num[4]`, respectively. Note, theoretically, these values might differ slightly from the corresponding number in the false negative cell below as the number of insignificant estimates doesn't include significant estimates with negative alphas. In the table, such estimates are identified as unskilled. These numbers account for roughly 60-70% of skilled funds. 
+
+The number of truly unskilled funds identified as skilled based on significantly positive alpha estimates is given in the false positive cell, and generally consists of around 2.5\% of the unskilled funds. Note since the other half of the significant funds are identified as unskilled, this number is 2.5, not 5. 
+
+Lambda = 0.1:
 \begin{center}
 \begin{tabular}{ c|cc|c } 
  
@@ -152,7 +170,7 @@ Lambda = 0.1
 \end{tabular}
 \end{center}
 
-Lambda = 0.25
+Lambda = 0.25:
 \begin{center}
 \begin{tabular}{ c|cc|c } 
  
@@ -165,7 +183,7 @@ Lambda = 0.25
 \end{tabular}
 \end{center}
 
-Lambda = 0.5
+Lambda = 0.5:
 \begin{center}
 \begin{tabular}{ c|cc|c } 
  
@@ -178,7 +196,7 @@ Lambda = 0.5
 \end{tabular}
 \end{center}
 
-Lambda = 0.75
+Lambda = 0.75:
 \begin{center}
 \begin{tabular}{ c|cc|c } 
  

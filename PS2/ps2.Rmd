@@ -1,0 +1,192 @@
+---
+title: "Problem Sheet 2"
+author: "Alexander Ober"
+date: "2/22/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Code is posted at the following site: https://github.com/alexanderober/BUSI525/tree/main/PS2
+
+## Part 1
+
+I simply follow what is suggested in the problem sheet. I've commented throughout to hopefully make it clear what I'm doing. Note the CDFs of the actual and bootstrapped match reasonably closely, which is nice. 
+
+```{r, echo = FALSE}
+## generate variables and simulated data
+N <- 1000
+T <- 120
+mean_mkt <- 0.05/12
+sd_mkt <- 0.2/sqrt(12)
+sd_res <- 0.1/sqrt(12)
+alpha <- rep(0, N)
+
+market_ret <- rnorm(T, mean = mean_mkt, sd = sd_mkt)
+M <- matrix(rep(market_ret, N), nrow=T)
+M_res <- matrix(rnorm(N*T, mean = 0, sd = sd_res), nrow=T)
+M_alpha <- matrix(rep(alpha, T), nrow = T)
+
+## simulate returns in a T by N matrix. Each column is a fund.
+M_ret <- M_alpha + M + M_res
+
+## initialize alpha estimates, pvalues, and tstats
+alpha_hat = rep(0, N)
+beta_hat = rep(0, N)
+pvals = rep(0, N)
+tstats_orig = rep(0, N)
+
+## matrix of redsiduals 
+resid = matrix(rep(0, N*T), nrow = T)
+
+## run a regression for each fund 
+for (i in 1:N){
+  Y <- M_ret[, i]
+  X <- M[, i]
+  
+  mod <- lm(Y~X)
+  summ <- summary(mod)
+  
+  alpha_hat[i] <- summ$coefficients[1, 1]
+  beta_hat[i] <- summ$coefficients[2, 1]
+  tstats_orig[i] <- summ$coefficients[1, 3]
+  pvals[i] <- summ$coefficients[1, 4]
+  resid[, i] <- resid(mod)
+                     
+}
+
+## Bootstrap
+B = 100
+alpha_hat_boot = matrix(rep(0, N*B), nrow = B)
+tstats_boot = matrix(rep(0, N*B), nrow = B)
+
+for (i in 1:B){
+  ## step 1
+  sam <- sample(c(1:T), T, replace = TRUE)
+  sor <- sort(sam)
+  
+  for (j in 1:N){
+    
+    ## step 2
+    rets = beta_hat[j]*market_ret[sor] + resid[sor, j]
+    
+    ## step 3
+    mod <- lm(rets~market_ret[sor])
+    summ <- summary(mod)
+    alpha_hat_boot[i, j] <- summ$coefficients[1, 1]
+    tstats_boot[i, j] <- summ$coefficients[1, 3]
+  }
+}
+
+## Sort for each bootstrap
+for (i in 1:B){
+  alpha_hat_boot[i, ] = sort(alpha_hat_boot[i, ])
+  tstats_boot[i, ] = sort(tstats_boot[i, ])
+}
+
+## Compute average bootstrap distribution
+distr_alpha <- colMeans(alpha_hat_boot)
+distr_tstats <- colMeans(tstats_boot)
+
+plot(ecdf(distr_tstats), 
+     main = "Bootstrapped/Actual T Stat CDFs", col = 3)
+lines(ecdf(tstats_orig), lty=3, col =20)
+legend(x = 'topleft',legend =  c('Bootstrap','Actual'), 
+       col = c(3,20), lwd = 2)
+
+plot(ecdf(alpha_hat_boot[,50]), main = "CDF of 5% Bootstrapped
+     t-stat")
+plot(ecdf(alpha_hat_boot[,950]), main = "CDF of 95% Bootstrapped
+     t-stat")
+
+```
+
+## Part 2
+
+Note as lambda and the alpha increase, the actual CDF moves to the right relative to the bootstrapped CDF. This is what we'd expect.
+
+```{r, echo = FALSE}
+
+for (alpha_0 in c(0.01, 0.025, 0.05)){
+  for (lambda in c(0.1, 0.25, 0.5, 0.75)){
+    
+    ## generate a proportion of positive alphas
+    alpha <- c(rep(alpha_0/12, lambda*N), rep(0, (1-lambda)*N))
+    M_alpha <- matrix(rep(alpha, T), nrow = T, byrow = TRUE)
+    
+    ## skilled funds correspond to the first lambda*N columns of the matrix
+    M_ret <- M_alpha + M + M_res
+    
+    alpha_hat = rep(0, N)
+    pvals = rep(0, N)
+    tstats_orig = rep(0, N)
+    
+    ## run regressions for each fund
+    for (i in 1:N){
+      Y <- M_ret[, i]
+      X <- M[, i]
+      
+      mod <- lm(Y~X)
+      summ <- summary(mod)
+      
+      alpha_hat[i] <- summ$coefficients[1, 1]
+      beta_hat[i] <- summ$coefficients[2, 1]
+      tstats_orig[i] <- summ$coefficients[1, 3]
+      pvals[i] <- summ$coefficients[1, 4]
+      resid[, i] <- resid(mod)
+      
+    }
+    
+    ## Bootstrap
+    alpha_hat_boot = matrix(rep(0, N*B), nrow = B)
+    tstats_boot = matrix(rep(0, N*B), nrow = B)
+    for (i in 1:B){
+      
+      ## step 1
+      sam <- sample(c(1:T), T, replace = TRUE)
+      sor <- sort(sam)
+      
+      for (j in 1:N){
+        
+        ## step 2
+        rets = beta_hat[j]*market_ret[sor] + resid[sor, j]
+        
+        ## step 3
+        mod <- lm(rets~market_ret[sor])
+        summ <- summary(mod)
+        alpha_hat_boot[i, j] <- summ$coefficients[1, 1]
+        tstats_boot[i, j] <- summ$coefficients[1, 3]
+      }
+    }
+    
+    ## Sort for each bootstrap
+    for (i in 1:B){
+      alpha_hat_boot[i, ] = sort(alpha_hat_boot[i, ])
+      tstats_boot[i, ] = sort(tstats_boot[i, ])
+    }
+    
+    ## Compute average bootstrap distribution
+    distr_alpha <- colMeans(alpha_hat_boot)
+    distr_tstats <- colMeans(tstats_boot)
+    
+    ## plots
+    title <- paste0("Bootstrapped/Actual T Stat CDFs, alpha_0 = ",
+                    alpha_0, ", lambda = ", lambda)
+    plot(ecdf(distr_tstats), main = title, col = 3)
+    lines(ecdf(tstats_orig), lty=3, col =20)
+    legend(x = 'topleft',legend =  c('Bootstrap','Actual'), 
+           col = c(3, 20), lwd = 2)
+    
+    plot(ecdf(alpha_hat_boot[,50]), 
+         main = "CDF of 5% Bootstrapped t-stat")
+    plot(ecdf(alpha_hat_boot[,950]), 
+         main = "CDF of 95% Bootstrapped t-stat")
+    
+  }
+}
+```
+

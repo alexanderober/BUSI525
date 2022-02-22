@@ -107,7 +107,7 @@ plot(ecdf(alpha_hat_boot[,950]), main = "CDF of 95% Bootstrapped
 
 ## Part 2
 
-Note as lambda and the alpha increase, the actual CDF moves to the right relative to the bootstrapped CDF. This is what we'd expect.
+Note as lambda and the alpha increase, the actual CDF moves to the right relative to the unskilled bootstrapped CDF. This is what we'd expect.
 
 ```{r, echo = FALSE}
 

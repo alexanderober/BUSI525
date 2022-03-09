@@ -1,0 +1,117 @@
+---
+title: "Problem Sheet 3"
+author: "Alexander Ober"
+date: "3/9/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Code is posted at the following site: https://github.com/alexanderober/BUSI525/tree/main/PS3
+
+## Part 1
+
+The bias decreases as the sample size increases. This is something Stambaugh points out; it's a small sample bias. 
+
+```{r, echo = TRUE}
+library(MASS)
+
+## initialize parameters
+beta = 0.015
+sigma_u = 0.053
+sigma_v = 0.044
+rho = 0.98
+rho_uv = -0.8
+sigma_uv = rho_uv*sigma_u*sigma_v
+Sigma <- matrix(c(sigma_u^2, sigma_uv, sigma_uv, sigma_v^2),2,2)
+
+## initialize vectors to hold the estimates
+mean_betas = rep(0, 10)
+betas_5 = rep(0, 10)
+betas_95 = rep(0, 10)
+
+B <- 250
+
+for (t in 120*1:10){
+  beta_hat = rep(0, B)
+  for (b in 1:B){
+    ## simulate the data forward
+    rx = matrix(rep(0, (t+1)*2), nrow = t+1)
+    uv = mvrnorm(n = t, rep(0, 2), Sigma)
+    for (i in 1:t){
+      rx[i+1, ] = c(beta, rho)*rx[i, 2] + uv[i,]
+    }
+    
+    ## perform the regression and hold the coefficient
+    mod <- lm(rx[(2:(t+1)), 1]~rx[(1:t), 2])
+    summ <- summary(mod)
+    beta_hat[b] <- summ$coefficients[2, 1]
+    summ$coefficients[2, 1]
+  }
+  
+  ## form aggregate statistics
+  beta_hat = sort(beta_hat)
+  mean_betas[t/120] = mean(beta_hat)
+  betas_5[t/120] = beta_hat[round(0.05*B)]
+  betas_95[t/120] = beta_hat[round(0.95*B)]
+}
+ 
+## plot the data 
+plot(mean_betas, main = "Estimated betas", 
+     col = 3, 
+     xlab = 'years', ylab = '',
+     ylim = c(-0.15, 0.15))
+lines(x = 1:10, mean_betas, col = 3)
+lines(x = 1:10, y = betas_5, col =20)
+lines(x = 1:10, y = betas_95, col =20)
+abline(h = beta, lty = 'dashed')
+legend(x = 'bottomright', legend = c(NULL,'Estimates', '5%', '95%', 'True Beta'), 
+       col = c(3, 20, 20, 'black'), lwd = 2)
+
+```
+
+## Part 2
+
+The bias is smaller for smaller magnitudes of the correlation. This is something Stambaugh points out. 
+```{r, echo = TRUE}
+## same code as above, with an outer loop to loop over values of rho_uv
+for (rho_uv in c(-0.2, -0.5, -0.8)){
+  sigma_uv = rho_uv*sigma_u*sigma_v
+  Sigma <- matrix(c(sigma_u^2, sigma_uv, sigma_uv, sigma_v^2),2,2)
+  for (t in 120*1:10){
+    beta_hat = rep(0, B)
+    for (b in 1:B){
+      rx = matrix(rep(0, (t+1)*2), nrow = t+1)
+      uv = mvrnorm(n = t, rep(0, 2), Sigma)
+      for (i in 1:t){
+        rx[i+1, ] = c(beta, rho)*rx[i, 2] + uv[i,]
+      }
+      mod <- lm(rx[(2:(t+1)), 1]~rx[(1:t), 2])
+      summ <- summary(mod)
+      beta_hat[b] <- summ$coefficients[2, 1]
+      summ$coefficients[2, 1]
+    }
+    beta_hat = sort(beta_hat)
+    mean_betas[t/120] = mean(beta_hat)
+    betas_5[t/120] = beta_hat[round(0.05*B)]
+    betas_95[t/120] = beta_hat[round(0.95*B)]
+  }
+  title = paste0('Estimated betas, rho_uv = ', rho_uv)
+  plot(mean_betas, main = title, 
+       col = 3, 
+       xlab = 'years', ylab = '', 
+       ylim = c(-0.15, 0.15))
+  lines(x = 1:10, mean_betas, col = 3)
+  lines(x = 1:10, y = betas_5, col =20)
+  lines(x = 1:10, y = betas_95, col =20)
+  abline(h = beta, lty = 'dashed')
+  legend(x = 'bottomright', legend = c(NULL,'Estimates', '5%', '95%', 'True Beta'), 
+         col = c(3, 20, 20, 'black'), lwd = 2)
+}
+
+```
+

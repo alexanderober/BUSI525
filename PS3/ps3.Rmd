@@ -50,7 +50,6 @@ for (t in 120*1:10){
     mod <- lm(rx[(2:(t+1)), 1]~rx[(1:t), 2])
     summ <- summary(mod)
     beta_hat[b] <- summ$coefficients[2, 1]
-    summ$coefficients[2, 1]
   }
   
   ## form aggregate statistics
@@ -93,7 +92,6 @@ for (rho_uv in c(-0.2, -0.5, -0.8)){
       mod <- lm(rx[(2:(t+1)), 1]~rx[(1:t), 2])
       summ <- summary(mod)
       beta_hat[b] <- summ$coefficients[2, 1]
-      summ$coefficients[2, 1]
     }
     beta_hat = sort(beta_hat)
     mean_betas[t/120] = mean(beta_hat)
